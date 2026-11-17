@@ -1,0 +1,224 @@
+start:
+; === Matchsticks Game Stage 4 - Human vs Computer with Graphics ===
+; Show welcome message
+      MOV R1, #welcomeMsg ; Load the memory address of the 'welcomeMsg' string into register R1.
+      STR R1, .WriteString ; Call the system routine to write the string pointed to by R1 to the console.
+      MOV R0, #10       ; Load the ASCII value for a newline character (10) into register R0.
+; Prompt player for name
+      MOV R1, #promptName ; Load the memory address of the 'promptName' string into register R1.
+      STR R1, .WriteString ; Call the system routine to write the string pointed to by R1 to the console.
+      MOV R0, #playerName ; Load the memory address of the 'playerName' buffer into register R0 (destination for input).
+      MOV R1, #64       ; Load the maximum length of the string to read (64 bytes) into register R1.
+      STR R0, .ReadString ; Call the system routine to read a string from the console into the buffer at R0, with max length R1.
+      MOV R0, #10       ; Load the ASCII value for a newline character (10) into register R0.
+      STR R0, .WriteChar ; Call the system routine to write the character in R0 to the console.
+get_matchsticks:
+; Ask for matchstick count (10–100)
+      MOV R1, #promptSticks ; Load the memory address of the 'promptSticks' string into register R1.
+      STR R1, .WriteString ; Call the system routine to write the string pointed to by R1 to the console.
+      LDR R4, .InputNum ; Load the integer value entered by the user from the console into register R4.
+      CMP R4, #10       ; Compare the value in R4 (user input) with the immediate value 10.
+      BLT get_matchsticks ; Branch Less Than: If R4 < 10, branch back to 'get_matchsticks' (input is too low).
+      CMP R4, #100      ; Compare the value in R4 with the immediate value 100.
+      BGT get_matchsticks ; Branch Greater Than: If R4 > 100, branch back to 'get_matchsticks' (input is too high).
+      STR R4, matchstickCount ; Store the valid matchstick count from R4 into the memory location 'matchstickCount'.
+      MOV R1, #newline  ; Load the memory address of the 'newline' string into register R1.
+      STR R1, .WriteString ; Call the system routine to write the newline character to the console.
+; Draw initial matchsticks
+      MOV R14, #after_draw_init ; Store the address of 'after_draw_init' into the Link Register (R14) as the return address.
+      B draw_sticks     ; Branch to the 'draw_sticks' subroutine to draw the matchsticks on the graphics screen.
+after_draw_init:
+      MOV R0, #0        ; Load the value 0 into register R0.
+      STR R0, .ClearScreen ; Call the system routine to clear the graphics screen (0 typically means clear).
+game_loop:
+; Show remaining matchsticks (text)
+      MOV R1, #statusMsg ; Load the memory address of the 'statusMsg' string into R1.
+      STR R1, .WriteString ; Write "Player " to the console.
+      BL display_name   ; Branch and Link to the 'display_name' subroutine to print the player's name.
+      MOV R1, #remainingMsg ; Load the memory address of the 'remainingMsg' string into R1.
+      STR R1, .WriteString ; Write ", there are " to the console.
+      LDR R0, matchstickCount ; Load the current value of 'matchstickCount' from memory into R0.
+      STR R0, .WriteUnsignedNum ; Call the system routine to write the unsigned number in R0 to the console.
+      MOV R1, #newline  ; Load the memory address of the 'newline' string into R1.
+      STR R1, .WriteString ; Write a newline character to the console.
+; Show remaining matchsticks (graphics)
+      MOV R14, #return_after_draw ; Store the address of 'return_after_draw' into R14 as the return address.
+      B draw_sticks     ; Branch to the 'draw_sticks' subroutine to update the graphics.
+return_after_draw:
+      MOV R0, R0        ; No Operation (NOP) - This instruction does nothing, serving as a placeholder or return target.
+; === Human Turn ===
+human_input:
+      MOV R1, #askRemove ; Load the memory address of the 'askRemove' string into R1.
+      STR R1, .WriteString ; Write "Player " to the console.
+      BL display_name   ; Branch and Link to the 'display_name' subroutine to print the player's name.
+      MOV R1, #removeMsg ; Load the memory address of the 'removeMsg' string into R1.
+      STR R1, .WriteString ; Write ", how many do you want to remove (1-7)?\n" to the console.
+      LDR R5, .InputNum ; Load the integer value entered by the human player into register R5.
+      CMP R5, #1        ; Compare the value in R5 with 1.
+      BLT human_input   ; Branch Less Than: If R5 < 1, branch back to 'human_input' (invalid input).
+      CMP R5, #7        ; Compare the value in R5 with 7.
+      BGT human_input   ; Branch Greater Than: If R5 > 7, branch back to 'human_input' (invalid input).
+      LDR R4, matchstickCount ; Load the current 'matchstickCount' into R4.
+      CMP R5, R4        ; Compare the number of sticks to remove (R5) with the total available (R4).
+      BGT human_input   ; Branch Greater Than: If R5 > R4, branch back to 'human_input' (cannot remove more than available).
+      SUB R4, R4, R5    ; Subtract the removed sticks (R5) from the total (R4), storing the result in R4.
+      STR R4, matchstickCount ; Store the new 'matchstickCount' back into memory.
+; === Show how many sticks human removed ===
+      MOV R1, #youRemoved ; Load the memory address of the 'youRemoved' string into R1.
+      STR R1, .WriteString ; Write "You removed: " to the console.
+      STR R5, .WriteUnsignedNum ; Write the number of sticks removed by the human (value in R5) to the console.
+      MOV R1, #newline  ; Load the memory address of the 'newline' string into R1.
+      STR R1, .WriteString ; Write a newline character to the console.
+      CMP R4, #0        ; Compare the remaining matchstick count (R4) with 0.
+      BEQ draw_message  ; Branch Equal: If R4 is 0, branch to 'draw_message' (it's a draw).
+      CMP R4, #1        ; Compare the remaining matchstick count (R4) with 1.
+      BEQ win_message   ; Branch Equal: If R4 is 1, branch to 'win_message' (human wins).
+; === Computer Turn ===
+comp_turn:
+      MOV R1, #compTurnMsg ; Load the memory address of the 'compTurnMsg' string into R1.
+      STR R1, .WriteString ; Write "Computer Player’s turn\n" to the console.
+comp_loop:
+      LDR R6, .Random   ; Load a random number from the system into register R6.
+      AND R6, R6, #7    ; Perform a bitwise AND with 7 (binary 0111). This limits the random number to 0-7.
+      ADD R6, R6, #1    ; Add 1 to R6, making the computer's choice between 1 and 8 sticks.
+      LDR R4, matchstickCount ; Load the current 'matchstickCount' into R4.
+      CMP R6, R4        ; Compare the computer's chosen removal (R6) with the total available (R4).
+      BGT comp_loop     ; Branch Greater Than: If R6 > R4, branch back to 'comp_loop' (computer tries to remove too many).
+      SUB R4, R4, R6    ; Subtract the removed sticks (R6) from the total (R4), storing the result in R4.
+      STR R4, matchstickCount ; Store the new 'matchstickCount' back into memory.
+      MOV R1, #compRemoved ; Load the memory address of the 'compRemoved' string into R1.
+      STR R1, .WriteString ; Write "Computer removed: " to the console.
+      STR R6, .WriteUnsignedNum ; Write the number of sticks removed by the computer (value in R6) to the console.
+      MOV R1, #newline  ; Load the memory address of the 'newline' string into R1.
+      STR R1, .WriteString ; Write a newline character to the console.
+      CMP R4, #0        ; Compare the remaining matchstick count (R4) with 0.
+      BEQ draw_message  ; Branch Equal: If R4 is 0, branch to 'draw_message' (it's a draw).
+      CMP R4, #1        ; Compare the remaining matchstick count (R4) with 1.
+      BEQ lose_message  ; Branch Equal: If R4 is 1, branch to 'lose_message' (computer wins, human loses).
+      B game_loop       ; Branch unconditionally back to the 'game_loop' for the next turn.
+; === Endgame States ===
+win_message:
+      MOV R14, #after_clear_win ; Store the address of 'after_clear_win' into R14 as the return address.
+      B clear_graphics  ; Branch to the 'clear_graphics' subroutine to clear the screen.
+after_clear_win:
+      MOV R1, #statusMsg ; Load the memory address of the 'statusMsg' string into R1.
+      STR R1, .WriteString ; Write "Player " to the console.
+      BL display_name   ; Branch and Link to the 'display_name' subroutine to print the player's name.
+      MOV R1, #winMsg   ; Load the memory address of the 'winMsg' string into R1.
+      STR R1, .WriteString ; Write " YOU WIN!\n" to the console.
+      MOV R1, #newline  ; Load the memory address of the 'newline' string into R1.
+      STR R1, .WriteString ; Write a newline character to the console.
+      B ask_again       ; Branch unconditionally to the 'ask_again' section.
+lose_message:
+      MOV R14, #after_clear_lose ; Store the address of 'after_clear_lose' into R14 as the return address.
+      B clear_graphics  ; Branch to the 'clear_graphics' subroutine to clear the screen.
+after_clear_lose:
+      MOV R1, #statusMsg ; Load the memory address of the 'statusMsg' string into R1.
+      STR R1, .WriteString ; Write "Player " to the console.
+      BL display_name   ; Branch and Link to the 'display_name' subroutine to print the player's name.
+      MOV R1, #loseMsg  ; Load the memory address of the 'loseMsg' string into R1.
+      STR R1, .WriteString ; Write " YOU LOSE!\n" to the console.
+      MOV R1, #newline  ; Load the memory address of the 'newline' string into R1.
+      STR R1, .WriteString ; Write a newline character to the console.
+      B ask_again       ; Branch unconditionally to the 'ask_again' section.
+draw_message:
+      MOV R14, #after_clear_draw ; Store the address of 'after_clear_draw' into R14 as the return address.
+      B clear_graphics  ; Branch to the 'clear_graphics' subroutine to clear the screen.
+after_clear_draw:
+      MOV R1, #drawMsg  ; Load the memory address of the 'drawMsg' string into R1.
+      STR R1, .WriteString ; Write "It’s a draw!\n" to the console.
+      MOV R1, #newline  ; Load the memory address of the 'newline' string into R1.
+      STR R1, .WriteString ; Write a newline character to the console.
+      B ask_again       ; Branch unconditionally to the 'ask_again' section.
+; === Ask to Play Again ===
+ask_again:
+      MOV R1, #againMsg ; Load the memory address of the 'againMsg' string into R1.
+      STR R1, .WriteString ; Write "Play again (y/n) ?" to the console.
+      MOV R0, #responseBuffer ; Load the memory address of the 'responseBuffer' into R0 (destination for input).
+      MOV R1, #4        ; Load the maximum length of the string to read (4 bytes) into R1.
+      STR R0, .ReadString ; Call the system routine to read a string from the console into the buffer at R0.
+      LDR R2, responseBuffer ; Load the first word (which contains the first character) from 'responseBuffer' into R2.
+      AND R2, R2, #0xFF ; Mask R2 to keep only the least significant byte (the ASCII value of the character).
+      CMP R2, #121      ; Compare the character in R2 with the ASCII value of 'y'.
+      BEQ start         ; Branch Equal: If it's 'y', branch back to 'start' to play again.
+      CMP R2, #89       ; Compare the character in R2 with the ASCII value of 'Y'.
+      BEQ start         ; Branch Equal: If it's 'Y', branch back to 'start' to play again.
+      CMP R2, #110      ; Compare the character in R2 with the ASCII value of 'n'.
+      BEQ end_game      ; Branch Equal: If it's 'n', branch to 'end_game'.
+      CMP R2, #78       ; Compare the character in R2 with the ASCII value of 'N'.
+      BEQ end_game      ; Branch Equal: If it's 'N', branch to 'end_game'.
+      B ask_again       ; Branch unconditionally back to 'ask_again' if the input was not 'y', 'Y', 'n', or 'N'.
+end_game:
+      MOV R1, #byeMsg   ; Load the memory address of the 'byeMsg' string into R1.
+      STR R1, .WriteString ; Write "Goodbye!\n" to the console.
+      HALT              ; Stop the ARMlite simulator execution.
+; === Subroutine: Draw Matchsticks ===
+draw_sticks:
+      MOV R0, #0        ; Load the value 0 into register R0.
+      STR R0, .ClearScreen ; Call the system routine to clear the graphics screen.
+      MOV R0, #0        ; Initialize R0 as the stick drawing counter (current stick number).
+      MOV R2, #0        ; Initialize R2 as the horizontal pixel offset for drawing each stick.
+      LDR R1, matchstickCount ; Load the total number of matchsticks to draw from 'matchstickCount' into R1.
+      MOV R6, #.PixelScreen ; Load the base memory address of the graphics pixel screen into R6.
+drawLoop:
+      CMP R0, R1        ; Compare the current stick count (R0) with the total sticks to draw (R1).
+      BGT doneDrawing   ; Branch Greater Than: If R0 > R1, all sticks have been drawn, so branch to 'doneDrawing'.
+      MOV R3, #0        ; Initialize R3 as the vertical pixel index for drawing a single stick (0 to 4).
+drawPixelLoop:
+      CMP R3, #5        ; Compare the vertical pixel index (R3) with 5.
+      BGT nextStick     ; Branch Greater Than: If R3 > 4 (i.e., R3 is 5), the current stick is fully drawn, so branch to 'nextStick'.
+      MOV R4, R3        ; Copy the vertical pixel index (R3) to R4.
+      LSL R4, R4, #8    ; Logical Shift Left R4 by 8 bits (multiply by 256). This calculates the row offset for the pixel.
+      ADD R4, R4, R2    ; Add the horizontal pixel offset (R2) to R4. R4 now holds the combined pixel offset (row + column).
+      ADD R5, R4, R6    ; Add the base pixel screen address (R6) to the pixel offset (R4) to get the absolute memory address of the pixel.
+      MOV R7, #.green   ; Load the color value for green into R7.
+      STR R7, [R5]      ; Store the green color value (R7) into the pixel memory location pointed to by R5, drawing the pixel.
+      ADD R3, R3, #1    ; Increment the vertical pixel index (R3) for the next pixel in the current stick.
+      B drawPixelLoop   ; Branch unconditionally back to 'drawPixelLoop' to draw the next pixel of the current stick.
+nextStick:
+      ADD R0, R0, #1    ; Increment the stick counter (R0) as one stick has been fully drawn.
+      ADD R2, R2, #4    ; Increment the horizontal pixel offset (R2) by 4 to position the next stick.
+      B drawLoop        ; Branch unconditionally back to 'drawLoop' to draw the next stick.
+doneDrawing:
+      MOV PC, R14       ; Move the return address from R14 into the Program Counter (PC), returning from the subroutine.
+; === Subroutine: Clear Graphics Screen Only ===
+clear_graphics:
+      MOV R0, #0        ; Load the value 0 into register R0.
+      STR R0, .ClearScreen ; Call the system routine to clear the graphics screen.
+      MOV PC, R14       ; Move the return address from R14 into the Program Counter (PC), returning from the subroutine.
+; === Subroutine: Display Player Name ===
+display_name:
+      MOV R2, #0        ; Initialize R2 as an offset/index for iterating through the player's name string.
+      MOV R4, #playerName ; Load the base memory address of the 'playerName' string into R4.
+print_name_loop:
+      ADD R3, R2, R4    ; Add the offset (R2) to the base address (R4) to get the address of the current character.
+      LDRB R0, [R3]     ; Load the byte (character) at the address in R3 into R0.
+      CMP R0, #0        ; Compare the loaded character (R0) with 0 (null terminator).
+      BEQ end_display   ; Branch Equal: If it's 0, the end of the string is reached, so branch to 'end_display'.
+      STR R0, .WriteChar ; Call the system routine to write the character in R0 to the console.
+      ADD R2, R2, #1    ; Increment the offset (R2) to point to the next character.
+      CMP R2, #64       ; Compare the offset (R2) with 64 (maximum length of the name buffer).
+      BLT print_name_loop ; Branch Less Than: If R2 < 64, branch back to 'print_name_loop' to print the next character.
+end_display:
+      MOV PC, R14       ; Move the return address from R14 into the Program Counter (PC), returning from the subroutine.
+; === STRINGS ===
+promptName: .ASCIZ "\nPlease enter your name:\n" ; Defines a null-terminated ASCII string for prompting the user's name.
+promptSticks: .ASCIZ "How many matchsticks (10-100)?\n" ; Defines a null-terminated ASCII string for prompting matchstick count.
+statusMsg: .ASCIZ "Player " ; Defines a null-terminated ASCII string for displaying player status.
+remainingMsg: .ASCIZ ", there are " ; Defines a null-terminated ASCII string for displaying remaining sticks.
+askRemove: .ASCIZ "Player " ; Defines a null-terminated ASCII string for asking player to remove sticks.
+removeMsg: .ASCIZ ", how many do you want to remove (1-7)?\n" ; Defines a null-terminated ASCII string for removal prompt.
+compTurnMsg: .ASCIZ "Computer Player’s turn\n" ; Defines a null-terminated ASCII string for computer's turn message.
+compRemoved: .ASCIZ "Computer removed: " ; Defines a null-terminated ASCII string for showing computer's removal.
+youRemoved: .ASCIZ "You removed: " ; Defines a null-terminated ASCII string for showing human's removal.
+winMsg: .ASCIZ " YOU WIN!\n" ; Defines a null-terminated ASCII string for win message.
+loseMsg: .ASCIZ " YOU LOSE!\n" ; Defines a null-terminated ASCII string for lose message.
+drawMsg: .ASCIZ "It’s a draw!\n" ; Defines a null-terminated ASCII string for draw message.
+againMsg: .ASCIZ "Play again (y/n) ?" ; Defines a null-terminated ASCII string for play again prompt.
+byeMsg: .ASCIZ "\nGoodbye!\n" ; Defines a null-terminated ASCII string for goodbye message.
+newline: .ASCIZ "\n"    ; Defines a null-terminated ASCII string for a newline character.
+welcomeMsg: .ASCIZ "\nWELCOME TO THE MATCHSTICK GAME\n" ; Defines a null-terminated ASCII string for the welcome message.
+; === DATA ===
+playerName: .BLOCK 64   ; Reserves 64 bytes of memory for storing the player's name.
+matchstickCount:.WORD 0 ; Reserves a 4-byte word in memory and initializes it to 0, to store the current matchstick count.
+responseBuffer: .BLOCK 4 ; Reserves 4 bytes of memory for storing the user's 'play again' response.

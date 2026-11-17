@@ -1,0 +1,60 @@
+VAR
+    Step : INT := 0;
+END_VAR
+
+CASE Step OF
+
+    0:  (* Idle *)
+        IF StartPB THEN
+            Step := 10;
+        END_IF
+
+    10: (* Move to Pick Position *)
+        X_Extend := TRUE;
+        IF X_Pick THEN
+            Step := 20;
+        END_IF
+
+    20: (* Lower to Pick *)
+        Z_Down := TRUE;
+        IF Z_Pick AND PartPresent THEN
+            Step := 30;
+        END_IF
+
+    30: (* Pick Part *)
+        Vacuum_On := TRUE;
+        Z_Down := FALSE;
+        Z_Up := TRUE;
+        IF Z_Home THEN
+            Step := 40;
+        END_IF
+
+    40: (* Move to Place Position *)
+        X_Extend := FALSE;
+        X_Retract := TRUE;
+        IF X_Place THEN
+            Step := 50;
+        END_IF
+
+    50: (* Lower to Place *)
+        Z_Up := FALSE;
+        Z_Down := TRUE;
+        IF Z_Place THEN
+            Step := 60;
+        END_IF
+
+    60: (* Release Part *)
+        Vacuum_On := FALSE;
+        Z_Down := FALSE;
+        Z_Up := TRUE;
+        IF Z_Home THEN
+            Step := 70;
+        END_IF
+
+    70: (* Return Home *)
+        X_Retract := FALSE;
+        IF X_Home THEN
+            Step := 0;
+        END_IF
+
+END_CASE
